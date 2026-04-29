@@ -1,0 +1,24 @@
+# Bundler
+/.bundle/
+/vendor/
+/vendor/bundle/
+Gemfile.lock
+
+# Gem build output
+*.gem
+/pkg/
+
+# Test coverage
+/coverage/
+
+# Editor / IDE
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db

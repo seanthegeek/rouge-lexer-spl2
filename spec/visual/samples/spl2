@@ -1,0 +1,166 @@
+| from main
+| search index=web sourcetype="access_combined_wcookie"
+| where status IN (200, 301, 302, 404, 500) AND host!="localhost"
+
+| eval velocity = distance / time
+| eval error = if(status == 200, "OK", "Problem")
+| eval lowuser = lower('user-name')
+| eval sum_of_areas = pi() * pow(radius_a, 2) + pi() * pow(radius_b, 2)
+| eval error_msg = case(error == 404, "Not found", error == 500, "Internal Server Error", true, "Other")
+| eval full_name = first_name + " " + last_name
+| eval x = tostring(amount, "commas")
+| eval price = "$" + tostring(amount, "commas")
+| eval n = relative_time(now(), "-1d@d")
+| eval hour_min = strftime(_time, "%H:%M")
+| eval safe = coalesce(value, fallback, 0)
+| eval flag = NOT isnull(field) AND len(field) > 0 OR forced XOR override
+
+| where like(ipaddress, "198.%")
+| where like(src, "10.9.165.%") OR cidrmatch("10.9.165.0/25", dst)
+| where distance / time > 100
+| where _time > relative_time(now(), "-2h@h") AND _time < relative_time(now(), "-1h@h")
+| where bytes BETWEEN 1024 AND 1048576
+
+| stats count() AS hits BY host
+| stats sum(bytes) AS total, avg(bytes) AS mean, max(bytes) AS peak BY host, sourcetype
+| stats count(action) AS count BY _time span=30m
+| stats distinct_count(user) AS users, perc95(latency) AS p95 BY service
+| stats first(value), last(value), median(value), stdev(value), values(category) BY group
+
+| timechart span=1h count BY status
+| timewrap 1d
+| streamstats count AS rownum, avg(value) AS rolling_avg
+| eventstats avg(bytes) AS site_avg BY host
+| tstats count WHERE index=main BY _time span=1h
+| mstats avg(_value) WHERE index=metrics BY metric_name span=5m
+
+| dedup host sortby - _time
+| sort - count, + host
+| head 100
+| reverse
+| table _time host status bytes
+| fields - _raw, _bkt
+| rename status AS http_status, _time AS event_time
+| fillnull value=0 bytes
+| fieldsummary maxvals=10
+| flatten data
+| expand items
+
+| rex field=_raw "user=(?<user>\\S+)"
+| spath input=payload output=user path=user.name
+| iplocation src
+| lookup users user OUTPUT email department
+| join type=left user [ search index=ldap | fields user email ]
+
+| append [ search index=archive earliest=-30d@d ]
+| appendcols [ search index=summary | stats sum(bytes) AS prior ]
+| appendpipe [ stats count AS subtotal ]
+| union dataset_a dataset_b
+| branch [ stats count BY host ] [ stats count BY user ]
+
+| makeresults count=5
+| addinfo
+| convert num(duration) AS duration_num
+| bin _time span=1h
+| makemv delim="," tags
+| mvexpand items
+| mvcombine items
+| nomv items
+| untable _time host count
+| typer
+
+| select user, host, COUNT(*) AS hits FROM main GROUP BY user, host HAVING hits > 10 ORDER BY hits DESC LIMIT 100
+SELECT count(), host, _time FROM main WHERE sourcetype="webaccess" AND `ERROR` GROUP BY host, span(_time, 5m) HAVING count > 10 ORDER BY count desc LIMIT 50 OFFSET 20
+
+| from $source
+| @maxdelay("10m") @maxdisk("1GB") stats sum(bytes_out) BY server_name
+| into $destination
+
+| eval raw = @"C:\Users\admin\file.log"
+| eval pattern = "needs \"escaped\" quotes"
+| eval simple = 'a single-quoted field reference'
+| eval n_int = 42
+| eval n_neg = -17
+| eval n_float = 3.14159
+| eval n_sci = 6.02e23
+| eval bool_t = true
+| eval bool_f = false
+| eval nothing = null
+
+| eval h = md5(secret)
+| eval h2 = sha256(payload)
+| eval clean = trim(value)
+| eval parts = split(csv, ",")
+| eval first_part = mvindex(parts, 0)
+| eval kept = mvfilter(match(field, "^err"))
+| eval typed = typeof(value)
+| eval converted = toint(text)
+| eval str = tostring(num)
+| eval js = tojson(obj)
+
+// Line comments are written with double slashes and run to end of line.
+| eval bytes = k * 1024 // the k field contains kilobytes
+/* Block comments use C-style markers and may span
+   multiple lines, useful for explaining complex pipelines. */
+| FROM index=mydataset WHERE source=usgs /* The source is the US geological service */
+| eval Description=case(depth<=70, "Shallow", depth>70 AND depth<=300, "Mid", depth>300, "Deep")
+
+// String templates: ${expression} interpolation inside double-quoted strings.
+| eval greeting = "Hello, ${user}! Status: ${status}"
+// Field templates: '${expr}' produces a dynamic field name.
+| eval '${prefix}_count' = count
+// Backtick search literals contain free-form search terms.
+| FROM main WHERE `invalid user sshd[5258]` AND `user "ladron" from 192.0.2.0/24`
+
+// Array and object literals.
+| eval greeting_list = ["Hello", "Howdy"]
+| eval matrix = [[1, 2, 3], [4, 5, 6]]
+| eval game = {name: "Settlers of Catan", type: "competitive"}
+| eval bridges = [{name: "Tower Bridge", length: 801}, {name: "Millennium Bridge", length: 1066}]
+| eval mixed = ["Settlers of Catan", 39.99, {category: "game", max_players: 4}]
+
+// Access expressions: dot for objects, square brackets for arrays.
+| eval first_bridge = bridges[0]
+| eval bridge_name = bridges[0].name
+| eval keyed = game["type"]
+
+// Lambda expressions: (params) -> expression  or  (params) -> { ... }
+| eval errors = filter(events, ($e) -> $e.status >= 400)
+| eval doubled = map([1, 2, 3], ($n) -> $n * 2)
+| eval total = reduce([1, 2, 3, 4], ($acc, $x) -> $acc + $x)
+| eval typed_lambda = filter(rows, ($row : object) -> $row.cost > 100)
+
+// Numeric literal type suffixes.
+| eval as_long = 1500000000000L
+| eval as_double = 12D
+| eval as_float = 3.14F
+| eval neg_float = -27F
+| eval sci_float = -1.2e5F
+
+// Custom data type and function statements.
+type http_error = int where $value in([403, 404, 408])
+type small_set = string where $value in(["a", "b", "c"])
+
+function is_error($code : number) : boolean {
+  return $code >= 400
+}
+
+function top($source, $field, $limit : int) {
+  return | FROM $source
+         | stats count() by $field
+         | sort -count
+         | head $limit
+}
+
+// Module statements: search assignments, imports, exports.
+$search1 = FROM main WHERE latest=-4h@h GROUP BY host
+import 'helpers' as helpers
+export search1
+
+// Expanded relative-time modifiers: long abbreviations, week-day anchors,
+// and offset chaining around the snap-to.
+| where _time > -7d@d AND _time <= @w0
+| where _time BETWEEN -1quarter@q AND now()
+| eval midday = relative_time(now(), "@d+12h")
+| eval friday = relative_time(now(), "-1week@w5")
+| eval monthly = relative_time(now(), "-1month")

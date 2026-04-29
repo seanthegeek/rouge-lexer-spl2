@@ -1,0 +1,7 @@
+| from main
+| where sourcetype="access_combined_wcookie" AND status IN (404, 500)
+| eval is_error = if(status >= 400, "true", "false"),
+       hour = strftime(_time, "%H:%M")
+| stats count() AS hits, avg(bytes) AS avg_bytes BY host, status
+| sort - hits
+| head 10
