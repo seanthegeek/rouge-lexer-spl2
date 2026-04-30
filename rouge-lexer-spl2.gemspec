@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name        = 'rouge-lexer-spl2'
-  s.version     = '0.1.0'
+  s.version     = '0.2.0'
   s.summary     = 'Rouge lexer for Splunk SPL2'
   s.description = 'A Rouge plugin providing syntax highlighting for Splunk SPL2, the search processing language used by Splunk Cloud Platform.'
   s.authors     = ['Sean Whalen']

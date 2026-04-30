@@ -164,3 +164,19 @@ export search1
 | eval midday = relative_time(now(), "@d+12h")
 | eval friday = relative_time(now(), "-1week@w5")
 | eval monthly = relative_time(now(), "-1month")
+
+// Additional eval functions: trig (tan/tanh), getfields, mvmap,
+// and object/xml conversion.
+| eval angle = tan(theta) + tanh(theta)
+| eval visible = getfields("status_*", "host_*")
+| eval squared = mvmap(numbers, ($n) -> $n * $n)
+| eval pairs = object_to_array(meta, "k", "v")
+| eval xml_doc = object_to_xml(payload)
+| eval round_trip = xml_to_object(xml_doc)
+
+// Aggregate aliases (c, dc) and exact percentile.
+| stats c(events) AS event_count, dc(user) AS users, exactperc99(latency) AS p99 BY host
+
+// Dataset and multivalue/array stats functions.
+| from repeat([{a: 1}, {a: 2}], 3)
+| stats unpivot(metrics) AS pair BY host

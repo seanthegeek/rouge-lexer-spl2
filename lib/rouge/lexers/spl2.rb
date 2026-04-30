@@ -39,12 +39,15 @@ module Rouge
       end
 
       # Clause/structural keywords used inside commands and statements.
+      # Includes uppercase SQL-style clauses used in `from` syntax (FROM,
+      # JOIN, SELECT, WHERE) — these are distinct from the lowercase
+      # pipeline commands of the same name.
       def self.keywords
         @keywords ||= Set.new %w(
-          AFTER APPLY AS ASC BEFORE BY DESC DISTINCT EXPORT FIT FUNCTION
-          GROUP GROUPBY HAVING IMPORT INNER LEFT LIMIT OFFSET ON ONCHANGE
-          ORDER ORDERBY OUTER OUTPUT OUTPUTNEW RESET RETURN THROUGH TYPE
-          WHILE
+          AFTER APPLY AS ASC BEFORE BY DESC DISTINCT EXPORT FIT FROM FUNCTION
+          GROUP GROUPBY HAVING IMPORT INNER JOIN LEFT LIMIT OFFSET ON ONCHANGE
+          ORDER ORDERBY OUTER OUTPUT OUTPUTNEW RESET RETURN SELECT THROUGH TYPE
+          WHERE WHILE
         )
       end
 
@@ -78,28 +81,30 @@ module Rouge
         @eval_functions ||= Set.new %w(
           abs acos acosh all any asin asinh atan atan2 atanh batch_id
           batch_time case ceil ceiling cidrmatch cluster coalesce cos cosh
-          exact exp filter floor hypot if in instance_id ipmask isarray
-          isbool isdouble isint ismv isnotnull isnull isnum isobject isstr
-          json json_append json_array json_array_to_mv json_delete
+          exact exp filter floor getfields hypot if in instance_id ipmask
+          isarray isbool isdouble isint ismv isnotnull isnull isnum isobject
+          isstr json json_append json_array json_array_to_mv json_delete
           json_entries json_extend json_extract json_extract_exact
           json_has_key_exact json_keys json_object json_set json_set_exact
           json_valid len like ln log lower ltrim map match max md5 min
           mv_to_json_array mvappend mvcount mvdedup mvfilter mvfind mvindex
-          mvjoin mvrange mvsort mvzip now null nullif pi pow printf random
-          reduce relative_time replace round rtrim searchmatch sha1 sha256
-          sha512 sigfig sin sinh spath split sqrt strftime strptime substr
-          time to_ocsf toarray tobool todouble toint tojson tomv tonumber
-          toobject tostring trim typeof upper urldecode validate
+          mvjoin mvmap mvrange mvsort mvzip now null nullif object_to_array
+          object_to_xml pi pow printf random reduce relative_time replace
+          round rtrim searchmatch sha1 sha256 sha512 sigfig sin sinh spath
+          split sqrt strftime strptime substr tan tanh time to_ocsf toarray
+          tobool todouble toint tojson tomv tonumber toobject tostring trim
+          typeof upper urldecode validate xml_to_object
         )
       end
 
-      # Stats / charting / aggregate / event-order functions.
+      # Stats / charting / aggregate / event-order / dataset functions.
       def self.stats_functions
         @stats_functions ||= Set.new %w(
-          avg count dataset distinct_count earliest earliest_time estdc
-          estdc_error first last latest latest_time list max mean median min
-          mode per_day per_hour per_minute per_second perc pivot range rate
-          span sparkline stdev stdevp sum sumsq values var varp
+          avg c count dataset dc distinct_count earliest earliest_time estdc
+          estdc_error exactperc first last latest latest_time list max mean
+          median min mode per_day per_hour per_minute per_second perc pivot
+          range rate repeat span sparkline stdev stdevp sum sumsq unpivot
+          values var varp
         )
       end
 
@@ -128,11 +133,19 @@ module Rouge
         |us|ms|cs|ds|M
       /x
 
+      # The bare-unit branch (`[+-](?:time_unit)`) requires a sign so that
+      # plain identifiers starting with a unit letter (stats, main, host,
+      # users, ...) are not consumed by the time_modifier rule. The trailing
+      # `(?!\w)` lookahead guarantees the matched literal ends at a word
+      # boundary, blocking partial-prefix matches like `-us` from `-users`.
       time_modifier = /
-        (?:[+-]?\d+(?:#{time_unit.source})|[+-]?(?:#{time_unit.source}))
-        (?:@(?:#{time_unit.source})(?:[+-]\d+(?:#{time_unit.source}))?)?
-        |
-        @(?:#{time_unit.source})(?:[+-]\d+(?:#{time_unit.source}))?
+        (?:
+          (?:[+-]?\d+(?:#{time_unit.source})|[+-](?:#{time_unit.source}))
+          (?:@(?:#{time_unit.source})(?:[+-]\d+(?:#{time_unit.source}))?)?
+          |
+          @(?:#{time_unit.source})(?:[+-]\d+(?:#{time_unit.source}))?
+        )
+        (?!\w)
       /x
 
       state :root do
